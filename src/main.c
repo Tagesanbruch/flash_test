@@ -10,7 +10,9 @@
 #include <zephyr/devicetree.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <hal/nrf_gpio.h>
+#include <hal/nrf_qspi.h>
+// #include <drivers/flash/nrf_qspi_nor.h>
 #if defined(CONFIG_BOARD_ADAFRUIT_FEATHER_STM32F405)
 #define SPI_FLASH_TEST_REGION_OFFSET 0xf000
 #elif defined(CONFIG_BOARD_ARTY_A7_DESIGNSTART_FPGA_CORTEX_M1) || \
@@ -37,13 +39,13 @@ void single_sector_test(const struct device *flash_dev)
 	uint8_t buf[sizeof(expected)];
 	int rc;
 
-	printf("\nPerform test on single sector");
+	printk("\nPerform test on single sector");
 	/* Write protection needs to be disabled before each write or
 	 * erase, since the flash component turns on write protection
 	 * automatically after completion of write and erase
 	 * operations.
 	 */
-	printf("\nTest 1: Flash erase\n");
+	printk("\nTest 1: Flash erase\n");
 
 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
 	 * SPI_FLASH_SECTOR_SIZE = flash size
@@ -51,37 +53,37 @@ void single_sector_test(const struct device *flash_dev)
 	rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
 			 SPI_FLASH_SECTOR_SIZE);
 	if (rc != 0) {
-		printf("Flash erase failed! %d\n", rc);
+		printk("Flash erase failed! %d\n", rc);
 	} else {
-		printf("Flash erase succeeded!\n");
+		printk("Flash erase succeeded!\n");
 	}
 
-	printf("\nTest 2: Flash write\n");
+	printk("\nTest 2: Flash write\n");
 
-	printf("Attempting to write %zu bytes\n", len);
+	printk("Attempting to write %zu bytes\n", len);
 	rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
-		printf("Flash write failed! %d\n", rc);
+		printk("Flash write failed! %d\n", rc);
 		return;
 	}
 
 	memset(buf, 0, len);
 	rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
-		printf("Flash read failed! %d\n", rc);
+		printk("Flash read failed! %d\n", rc);
 		return;
 	}
 
 	if (memcmp(expected, buf, len) == 0) {
-		printf("Data read matches data written. Good!!\n");
+		printk("Data read matches data written. Good!!\n");
 	} else {
 		const uint8_t *wp = expected;
 		const uint8_t *rp = buf;
 		const uint8_t *rpe = rp + len;
 
-		printf("Data read does not match data written!!\n");
+		printk("Data read does not match data written!!\n");
 		while (rp < rpe) {
-			printf("%08x wrote %02x read %02x %s\n",
+			printk("%08x wrote %02x read %02x %s\n",
 			       (uint32_t)(SPI_FLASH_TEST_REGION_OFFSET + (rp - buf)),
 			       *wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
 			++rp;
@@ -98,14 +100,14 @@ void multi_sector_test(const struct device *flash_dev)
 	uint8_t buf[sizeof(expected)];
 	int rc;
 
-	printf("\nPerform test on multiple consequtive sectors");
+	printk("\nPerform test on multiple consequtive sectors");
 
 	/* Write protection needs to be disabled before each write or
 	 * erase, since the flash component turns on write protection
 	 * automatically after completion of write and erase
 	 * operations.
 	 */
-	printf("\nTest 1: Flash erase\n");
+	printk("\nTest 1: Flash erase\n");
 
 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
 	 * SPI_FLASH_SECTOR_SIZE = flash size
@@ -113,7 +115,7 @@ void multi_sector_test(const struct device *flash_dev)
 	 */
 	rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, SPI_FLASH_SECTOR_SIZE * 2);
 	if (rc != 0) {
-		printf("Flash erase failed! %d\n", rc);
+		printk("Flash erase failed! %d\n", rc);
 	} else {
 		/* Read the content and check for erased */
 		memset(buf, 0, len);
@@ -122,48 +124,48 @@ void multi_sector_test(const struct device *flash_dev)
 		while (offs < SPI_FLASH_TEST_REGION_OFFSET + 2 * SPI_FLASH_SECTOR_SIZE) {
 			rc = flash_read(flash_dev, offs, buf, len);
 			if (rc != 0) {
-				printf("Flash read failed! %d\n", rc);
+				printk("Flash read failed! %d\n", rc);
 				return;
 			}
 			if (buf[0] != 0xff) {
-				printf("Flash erase failed at offset 0x%x got 0x%x\n",
+				printk("Flash erase failed at offset 0x%x got 0x%x\n",
 				offs, buf[0]);
 				return;
 			}
 			offs += SPI_FLASH_SECTOR_SIZE;
 		}
-		printf("Flash erase succeeded!\n");
+		printk("Flash erase succeeded!\n");
 	}
 
-	printf("\nTest 2: Flash write\n");
+	printk("\nTest 2: Flash write\n");
 
 	size_t offs = SPI_FLASH_TEST_REGION_OFFSET;
 
 	while (offs < SPI_FLASH_TEST_REGION_OFFSET + 2 * SPI_FLASH_SECTOR_SIZE) {
-		printf("Attempting to write %zu bytes at offset 0x%x\n", len, offs);
+		printk("Attempting to write %zu bytes at offset 0x%x\n", len, offs);
 		rc = flash_write(flash_dev, offs, expected, len);
 		if (rc != 0) {
-			printf("Flash write failed! %d\n", rc);
+			printk("Flash write failed! %d\n", rc);
 			return;
 		}
 
 		memset(buf, 0, len);
 		rc = flash_read(flash_dev, offs, buf, len);
 		if (rc != 0) {
-			printf("Flash read failed! %d\n", rc);
+			printk("Flash read failed! %d\n", rc);
 			return;
 		}
 
 		if (memcmp(expected, buf, len) == 0) {
-			printf("Data read matches data written. Good!!\n");
+			printk("Data read matches data written. Good!!\n");
 		} else {
 			const uint8_t *wp = expected;
 			const uint8_t *rp = buf;
 			const uint8_t *rpe = rp + len;
 
-			printf("Data read does not match data written!!\n");
+			printk("Data read does not match data written!!\n");
 			while (rp < rpe) {
-				printf("%08x wrote %02x read %02x %s\n",
+				printk("%08x wrote %02x read %02x %s\n",
 					(uint32_t)(offs + (rp - buf)),
 					*wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
 				++rp;
@@ -178,14 +180,21 @@ void multi_sector_test(const struct device *flash_dev)
 int main(void)
 {
 	const struct device *flash_dev = DEVICE_DT_GET(DT_ALIAS(spi_flash0));
-
+	uint8_t jid[3] = {0}; 
+	// int rd = qspi_read_jedec_id((flash_dev, jid));
+	nrf_gpio_cfg_output(NRF_GPIO_PIN_MAP(0,21));
+	nrf_gpio_pin_write(NRF_GPIO_PIN_MAP(0,21),0);
+	nrf_gpio_cfg_output(NRF_GPIO_PIN_MAP(0,29));
+	nrf_gpio_pin_write(NRF_GPIO_PIN_MAP(0,29),1);
+	nrf_gpio_cfg_output(NRF_GPIO_PIN_MAP(0,24));
+	nrf_gpio_pin_write(NRF_GPIO_PIN_MAP(0,24),1);
 	if (!device_is_ready(flash_dev)) {
 		printk("%s: device not ready.\n", flash_dev->name);
-		return 0;
+		// return 0;
 	}
 
-	printf("\n%s SPI flash testing\n", flash_dev->name);
-	printf("==========================\n");
+	printk("\n%s SPI flash testing\n", flash_dev->name);
+	printk("==========================\n");
 
 	single_sector_test(flash_dev);
 #if defined SPI_FLASH_MULTI_SECTOR_TEST
